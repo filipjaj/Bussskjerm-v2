@@ -1,95 +1,91 @@
-# BussTider Display
+#BussTider ESP8266
 
-Vis sanntids bussavganger på en liten OLED-skjerm med ESP8266.
+Sanntids-avgangstavle for kollektivtransport på en OLED-skjerm (SSD1306 128x64), drevet av en ESP8266 (NodeMCU v2).
 
 ## Hardware
 
-| Komponent | Eksempel |
-|-----------|----------|
-| ESP8266 | NodeMCU, Wemos D1 Mini, eller lignende |
-| OLED Display | 128x64 SSD1306 (I2C) |
-| Knapp (valgfri) | For manuell sidebytting / reset |
+- ESP8266 NodeMCU v2
+- SSD1306 OLED 128x64 (I2C)
+  - SDA → GPIO14 (D5)
+  - SCL → GPIO12 (D6)
+- Flash-knapp → GPIO0 (D3)
 
-### Kobling
+## Oppsett (utvikling)
 
-| OLED | ESP8266 |
-|------|---------|
-| VCC | 3.3V |
-| GND | GND |
-| SDA | D2 (GPIO4) |
-| SCL | D1 (GPIO5) |
+Prosjektet bruker [PlatformIO](https://platformio.org/).
 
-**Reset-knapp:** Koble mellom GPIO0 og GND (intern pull-up brukes).
+### Installer PlatformIO
 
-## Arduino IDE Oppsett
+```bash
+pip3 install platformio
+```
 
-### 1. Installer ESP8266 Board Support
+### Kompiler
 
-1. Åpne **File → Preferences**
-2. Legg til denne URL-en i "Additional Board Manager URLs":
-   ```
-   http://arduino.esp8266.com/stable/package_esp8266com_index.json
-   ```
-3. Gå til **Tools → Board → Boards Manager**
-4. Søk etter "esp8266" og installer **esp8266 by ESP8266 Community**
+```bash
+pio run
+```
 
-### 2. Installer biblioteker
+### Flash til enhet
 
-Gå til **Sketch → Include Library → Manage Libraries** og installer:
+Koble til ESP8266 via USB og kjør:
 
-- `ArduinoJson` (by Benoit Blanchon)
-- `Adafruit SSD1306` (by Adafruit)
-- `Adafruit GFX Library` (by Adafruit)
+```bash
+pio run -t upload
+```
 
-### 3. Velg board
+Eller bruk scriptet:
 
-Under **Tools**:
-- **Board:** NodeMCU 1.0 (eller ditt ESP8266-board)
-- **Upload Speed:** 115200
-- **Port:** Velg riktig COM-port
+```bash
+./flash.sh
+```
 
-## Flash
+### Seriell monitor
 
-1. Koble ESP8266 til PC via USB
-2. Åpne `.ino`-filen i Arduino IDE
-3. Klikk **Upload** (→)
+```bash
+pio device monitor
+```
 
-## Bruk
+## Prosjektstruktur
 
-### Første oppstart
+```
+busstider_esp8266_v4/
+├── src/
+│   └── busstider_esp8266_v4.ino   # Hovedkode
+├── platformio.ini                  # PlatformIO-konfigurasjon
+├── flash.sh                        # Hurtig-flash script
+├── SETUP_GUIDE.md                  # Brukerveiledning
+├── BussTider_Oppsettguide.pdf      # Brukerveiledning (PDF)
+└── README.md
+```
 
-1. Displayet starter i **Setup Mode** og oppretter et WiFi-nettverk: `BussTider-Setup`
-2. Koble til nettverket med mobil/PC
-3. Åpne `192.168.4.1` i nettleseren
-4. Velg WiFi-nettverk, skriv inn passord
-5. Legg inn API-endpoint (f.eks. `https://departures.filipjohn.workers.dev/d/...`)
-6. Velg responsformat og lagre
+## Hvordan det fungerer
 
-### Responsformater
+1. Ved første oppstart (eller etter reset) starter enheten i **Setup Mode** — en WiFi access point (`BussTider-Setup`) med captive portal
+2. Brukeren kobler til, velger WiFi-nettverk og legger inn API-endepunkt fra [avganger.filipjohn.com](https://avganger.filipjohn.com/)
+3. Enheten kobler til WiFi og henter avganger i verbose-format hvert 20. sekund
+4. Displayet viser linjenummer, destinasjon og minutter til avgang
+5. Paginering skjer automatisk hvert 5. sekund, eller manuelt via Flash-knappen
 
-| Format | Eksempel |
-|--------|----------|
-| Simple | `{"31": 5, "74": 2}` |
-| List | `[{"line": "31", "minutes": 5}]` |
-| Verbose | `{"departures": [{"line": "31", "destination": "Tonsenhagen", "minutes": 5}]}` |
+## Reset
 
-### Knappfunksjoner
+1. Trykk **Reset**
+2. Hold inne **Flash** mens enheten restarter
+3. Konfigurasjon slettes og Setup Mode starter
 
-- **Kort trykk:** Bytt side manuelt
-- **Hold inne ved oppstart:** Reset konfigurasjon og gå til setup mode
+## API-format
 
-## Feilsøking
+Endepunktet må returnere verbose-format:
 
-| Problem | Løsning |
-|---------|---------|
-| OLED viser ingenting | Sjekk I2C-adresse (standard `0x3C`), sjekk kobling |
-| WiFi kobler ikke til | Hold knappen inne ved oppstart for å resette |
-| HTTP-feil | Sjekk at endpoint-URL er riktig og returnerer gyldig JSON |
+```json
+{
+  "departures": [
+    { "line": "54", "destination": "Kjelsaas", "minutes": 7 },
+    { "line": "54", "destination": "Kjelsaas", "minutes": 22 }
+  ]
+}
+```
 
-## API
+## Data
 
-Displayet forventer et JSON-API som returnerer avgangstider. Intervall: hvert 20. sekund.
-
-### Lag ditt eget endepunkt
-
-Gå til [departures.filipjohn.workers.dev](https://departures.filipjohn.workers.dev/) for å opprette et personlig API-endepunkt for din holdeplass.
+Avgangstider fra [Entur](https://entur.no).
